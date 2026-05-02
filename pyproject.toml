@@ -1,0 +1,23 @@
+[project]
+name = "mcp-sap-focusedrun"
+version = "0.1.0"
+description = "MCP server for integrating with SAP FocusedRun"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cachetools>=5.3.0",
+    "fastmcp >= 3.2.0",
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.25.0",
+    "python-dotenv>=1.2.1",
+]
+
+[project.scripts]
+mcp-sap-focusedrun = "mcp_sap_focusedrun.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
