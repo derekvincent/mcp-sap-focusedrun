@@ -27,15 +27,13 @@ class FocusedRun:
         "CUSTOMER_NETWORK",
     }
 
-    def __init__(self, base_url, sap_client, api_key, api_user, api_password):
+    def __init__(self, base_url, sap_client, api_key, api_user, api_password, cache_ttl=300, cache_maxsize=100):
         self.base_url = base_url.rstrip("/")  # Ensure no trailing slash
         self.api_key = api_key
         self.api_user = api_user
         self.api_password = api_password
         self.sap_client = sap_client
-        self.cache = TTLCache(
-            maxsize=100, ttl=300
-        )  # Cache up to 100 requests for 5 minutes
+        self.cache = TTLCache(maxsize=cache_maxsize, ttl=cache_ttl)
 
     # Private Methods
     # Filter builders
@@ -150,13 +148,11 @@ class FocusedRun:
 
     # Technical Instance APIs
     def get_technical_instances(
-        self, system_ids: List[str] = None, instance_names: List[str] = None, **kwargs
+        self, system_ids: List[str] = None, **kwargs
     ) -> dict:
         filters = []
         if system_ids:
             filters.append(self.__build_filter("EXTENDED_SID", system_ids))
-        if instance_names:
-            filters.append(self.__build_filter("INSTANCE_NAME", instance_names))
 
         if filters:
             kwargs["$filter"] = " and ".join(filters)

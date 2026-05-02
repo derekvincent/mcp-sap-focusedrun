@@ -15,6 +15,9 @@ dependencies = [
 [project.scripts]
 mcp-sap-focusedrun = "mcp_sap_focusedrun.server:main"
 
+[dependency-groups]
+dev = ["pytest"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

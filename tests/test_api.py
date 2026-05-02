@@ -41,6 +41,11 @@ def test_get_hosts_by_customer_names():
     result = frun.get_hosts(customer_names=["ADM"])
     assert_no_error(result)
 
+def test_get_hosts_by_customer_networks():
+    frun = get_client()
+    result = frun.get_hosts(customer_networks=["LOCALNETWORK"])
+    assert_no_error(result)
+
 def test_get_hosts_pagination():
     frun = get_client()
     result = frun.get_hosts(**{"$top": 1, "$skip": 1})
@@ -117,6 +122,11 @@ def test_get_cloud_tenants_by_tenant_ids():
     result = frun.get_cloud_tenants(tenant_ids=["MY_TENANT"])
     assert_no_error(result)
 
+def test_get_cloud_tenants_by_customer_names():
+    frun = get_client()
+    result = frun.get_cloud_tenants(customer_names=["ADM"])
+    assert_no_error(result)
+
 def test_get_cloud_tenants_pagination():
     frun = get_client()
     result = frun.get_cloud_tenants(**{"$top": 2, "$skip": 0})
@@ -133,6 +143,11 @@ def test_get_databases():
 def test_get_databases_by_system_ids():
     frun = get_client()
     result = frun.get_databases(system_ids=["PRD"])
+    assert_no_error(result)
+
+def test_get_databases_by_customer_names():
+    frun = get_client()
+    result = frun.get_databases(customer_names=["ADM"])
     assert_no_error(result)
 
 def test_get_databases_pagination():

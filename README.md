@@ -11,7 +11,17 @@ This project provides a Model-Context-Protocol (MCP) server that acts as a bridg
 - **Built-in 5-minute TTL caching** to protect the SAP backend from duplicate LLM requests.
 - Includes predefined MCP Prompts for deep system analysis and landscape discovery.
 
-## Installation
+## Quick Start 
+
+### Prerequisites
+
+- ***[uv](https://docs.astral.sh/uv/)*** installed.
+- ***Python 3.13+***
+- ***FocusedRun technical user*** with API access to a SAP FocusedRun instance with the following roles ```SAP_FRN_LDB_ALL``` and ```SAP_FRN_LDB_DISP```.
+- ***SAP ICF service*** ```sap/frun/landscape/landscape_api``` activated. 
+- ***An MCP client*** Cursor, Gemini, Claude Desktop, VS Code with Copilot, etc.
+  
+### Installation
 
 1.  **Clone the repository:**
     ```bash
@@ -25,7 +35,7 @@ This project provides a Model-Context-Protocol (MCP) server that acts as a bridg
     uv sync
     ```
 
-## Configuration
+## Usage
 
 The server is configured using environment variables. Create a `.env` file in the root of the project directory and add the following credentials:
 
@@ -36,13 +46,47 @@ API_USER="YOUR_API_USER"
 API_PASSWORD="YOUR_API_PASSWORD"
 ```
 
-## Usage
-
-Once installed and configured, you can start the MCP server with the following command:
-```bash
-uv run mcp-sap-focusedrun
+Or pass the configuration directly in your MCP client config (no .env file needed):
+```json
+{
+  "mcpServers": {
+    "sap-focusedrun": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/mcp-sap-fucsedrun",
+        "run",
+        "mcp-sap-focusedrun],
+      "env": {
+        "API_BASE_URL": "https://<sap focused run host>/sap/frun/landscape/landscape_api",
+        "SAP_CLIENT": "100",
+        "API_USER": "YOUR_API_USER",
+        "API_PASSWORD": "YOUR_API_PASSWORD"
+      }
+    }
+  }
+}
 ```
+or via the Docker image:
 
+```bash
+docker build -t mcp-sap-focusedrun .
+docker run -d --name sap-mcp -p 8000:8000 --env-file .env mcp-sap-focusedrun
+
+```
+## Configuration 
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| API_BASE_URL | X | - | Base url for the service to call the API |
+| SAP_CLIENT | X | 100 | SAP FocusedRun Client |
+| API_USER | X | - | Technical users name |
+| API_PASSWORD | X | - | Technical users password |
+| CACHE_TTL | | 300 | The Service Cache Time to Live (in seconds) |
+| CACHE_MAXSIZE | | 100 | The maximum number of API responses to store in memory |
+| LOG_LEVEL | | INFO | The logging level (e.g., INFO, DEBUG) |
+| PORT | | 8000 | The port to bind to when running via HTTP/SSE |
+| TRANSPORT | | stdio | Use "sse" for HTTP Server-Sent Events, or "stdio" for standard input/output |
+| MCP_SERVER_AUTH_TOKEN | | - | Strongly recommended for SSE transport |
 ## Running Tests
 
 To run the test suite and verify the connection to your SAP Focused Run system, first install `pytest`:
@@ -53,3 +97,10 @@ Then run the tests:
 ```bash
 pytest
 ```
+
+## Current Issues 
+
+1. The following API's endpoint have not been fully tested: 
+   1. ```landscape_api_single_database```
+   2. ```landscape_api_technical_instances```
+   3. ```landscape_api_abap_clients```

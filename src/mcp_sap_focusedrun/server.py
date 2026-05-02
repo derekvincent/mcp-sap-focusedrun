@@ -8,9 +8,15 @@ from mcp.types import ToolAnnotations
 
 from .focusedrun_client import FocusedRun
 
+# Load environment variables
+load_dotenv()
+
 # Configure logging
+log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_str, logging.INFO)
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -33,13 +39,14 @@ def get_focusedrun_client() -> FocusedRun:
     global _frun_client
     if _frun_client is None:
         logger.info("Initializing SAP Focused Run client...")
-        load_dotenv()
         _frun_client = FocusedRun(
             base_url=os.getenv("API_BASE_URL", ""),
             sap_client=os.getenv("SAP_CLIENT", "100"),
             api_key=os.getenv("API_KEY", ""),
             api_user=os.getenv("API_USER", ""),
-            api_password=os.getenv("API_PASSWORD", "")
+            api_password=os.getenv("API_PASSWORD", ""),
+            cache_ttl=int(os.getenv("CACHE_TTL", "300")),
+            cache_maxsize=int(os.getenv("CACHE_MAXSIZE", "100"))
         )
     return _frun_client
 
@@ -85,6 +92,28 @@ async def get_lmdb_systems(
     Retrieve technical systems (e.g., SAP ABAP, Java, or Cloud services) from the SAP Focused Run LMDB.
     Use this tool to find a system's EXTENDED_SID, which is often required as an input for other tools.
     This is a read-only operation.
+    Valid system_types include (but are not limited to):
+      - 'ABAP':	Application Server ABAP
+      - 'ATC':	Apache Tomcat Server
+      - 'BOBJ':	SAP BusinessObjects Cluster
+      - 'DBSYSTEM':	Database System
+      - 'DIAGNAGENT':	Diagnostics Agent
+      - 'EXT_SRV':	External Service
+      - 'HANADB':	SAP HANA Database
+      - 'IS_EM':	Introscope Enterprise Manager (Standalone)
+      - 'IS_MOM':	Introscope Enterprise Manager (Cluster)
+      - 'JAVA':	Application Server Java
+      - 'LIVE_CACHE':	SAP liveCache
+      - 'MDM':	SAP NetWeaver Master Data Management Server
+      - 'MSIISINST':	Microsoft Internet Information Services
+      - 'MS_.NET':	.NET System
+      - 'SUP':	SAP Mobile Platform
+      - 'TREX':	TREX System
+      - 'UNSP3TIER':	Unspecific 3-Tier System
+      - 'UNSPAPP':	Unspecific Standalone Application System
+      - 'UNSPECIFIC':	Unspecific Cluster System
+      - 'WEBDISP':	SAP Web Dispatcher
+      - 'WEBSPHERE':	IBM WebSphere Application Server
     Filters can be combined. 
     Use top and skip for pagination. Use select_fields to limit the returned columns.
     """
@@ -104,7 +133,6 @@ async def get_lmdb_systems(
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_technical_instances(
     system_ids: Optional[List[str]] = None,
-    instance_names: Optional[List[str]] = None,
     top: Optional[int] = None,
     skip: Optional[int] = None,
     select_fields: Optional[List[str]] = None
@@ -116,7 +144,7 @@ async def get_lmdb_technical_instances(
     Filters can be combined.
     Use top and skip for pagination. Use select_fields to limit the returned columns.
     """
-    logger.info(f"Tool 'get_lmdb_technical_instances' invoked | system_ids={system_ids}, instances={instance_names}, select={select_fields}")
+    logger.info(f"Tool 'get_lmdb_technical_instances' invoked | system_ids={system_ids}, select={select_fields}")
     client = get_focusedrun_client()
     
     kwargs = {}
@@ -127,7 +155,7 @@ async def get_lmdb_technical_instances(
     if select_fields:
         kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_technical_instances(system_ids=system_ids, instance_names=instance_names, **kwargs)
+    return client.get_technical_instances(system_ids=system_ids, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_databases(
@@ -292,13 +320,32 @@ def main():
         import uvicorn
         port = int(os.getenv("PORT", "8000"))
         
-        # FastMCP's SSE transport defaults to 127.0.0.1. 
-        # We monkeypatch uvicorn.Config to force binding to 0.0.0.0 for Docker compatibility.
+        # FastMCP's SSE transport defaults to 127.0.0.1.
+        # We monkeypatch uvicorn.Config to force binding to 0.0.0.0 and optionally inject ASGI auth middleware.
         original_config_init = uvicorn.Config.__init__
-        def patched_config_init(self, *args, **kwargs):
+        def patched_config_init(self, app, *args, **kwargs):
             kwargs["host"] = "0.0.0.0"
             kwargs["port"] = port
-            original_config_init(self, *args, **kwargs)
+            
+            auth_token = os.getenv("MCP_SERVER_AUTH_TOKEN")
+            if auth_token:
+                logger.info("Authentication enabled. Bearer token required for SSE endpoints.")
+                class BearerAuthMiddleware:
+                    def __init__(self, app):
+                        self.app = app
+                        self.token = f"Bearer {auth_token}".encode("utf-8")
+                    
+                    async def __call__(self, scope, receive, send):
+                        if scope["type"] == "http":
+                            headers = dict(scope.get("headers", []))
+                            if headers.get(b"authorization") != self.token:
+                                await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"application/json"), (b"content-length", b"25")]})
+                                await send({"type": "http.response.body", "body": b'{"error": "Unauthorized"}', "more_body": False})
+                                return
+                        return await self.app(scope, receive, send)
+                app = BearerAuthMiddleware(app)
+            
+            original_config_init(self, app, *args, **kwargs)
         uvicorn.Config.__init__ = patched_config_init
         
         mcp.run(transport="sse")
