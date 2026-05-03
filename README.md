@@ -1,8 +1,11 @@
 # MCP Server for SAP Focused Run
 
-This project provides a Model-Context-Protocol (MCP) server that acts as a bridge between a Large Language Model (LLM) and an SAP Focused Run system. It exposes the Focused Run Landscape Management Database (LMDB) Public API as a set of tools that an LLM can easily query.
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/downloads/)
+[![Built with FastMCP](https://img.shields.io/badge/Built%20with-FastMCP-blue)](https://github.com/mcp-ai/fastmcp)
+> This project provides a Model-Context-Protocol (MCP) server that acts as a bridge between a Large Language Model (LLM) and an SAP Focused Run system. It exposes the Focused Run Landscape Management Database (LMDB) Public API as a set of tools that an LLM can easily query.
 
-## Features
+## Key Features
 
 - Exposes comprehensive SAP Focused Run endpoints: **Hosts, Systems, Databases, Cloud Tenants, Technical Instances, ABAP Clients, Software Components, and Product Versions**.
 - Lazy, on-demand client initialization.
@@ -56,7 +59,8 @@ Or pass the configuration directly in your MCP client config (no .env file neede
         "--directory",
         "/path/to/mcp-sap-fucsedrun",
         "run",
-        "mcp-sap-focusedrun],
+        "mcp-sap-focusedrun"
+      ],
       "env": {
         "API_BASE_URL": "https://<sap focused run host>/sap/frun/landscape/landscape_api",
         "SAP_CLIENT": "100",
