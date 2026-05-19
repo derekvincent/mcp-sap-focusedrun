@@ -27,13 +27,14 @@ class FocusedRun:
         "CUSTOMER_NETWORK",
     }
 
-    def __init__(self, base_url, sap_client, api_key, api_user, api_password, cache_ttl=300, cache_maxsize=100):
+    def __init__(self, base_url, sap_client, api_key, api_user, api_password, cache_ttl=300, cache_maxsize=100, additional_headers: dict = None):
         self.base_url = base_url.rstrip("/")  # Ensure no trailing slash
         self.api_key = api_key
         self.api_user = api_user
         self.api_password = api_password
         self.sap_client = sap_client
         self.cache = TTLCache(maxsize=cache_maxsize, ttl=cache_ttl)
+        self.additional_headers = additional_headers or {}
 
     # Private Methods
     # Filter builders
@@ -67,6 +68,7 @@ class FocusedRun:
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        headers.update(self.additional_headers)
         if self.api_key:
             headers["APIKey"] = self.api_key
 

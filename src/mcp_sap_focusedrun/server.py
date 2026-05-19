@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -39,6 +40,17 @@ def get_focusedrun_client() -> FocusedRun:
     global _frun_client
     if _frun_client is None:
         logger.info("Initializing SAP Focused Run client...")
+        
+        # Parse custom headers if provided
+        custom_headers = {}
+        custom_headers_json = os.getenv("CUSTOM_HEADERS")
+        if custom_headers_json:
+            try:
+                custom_headers = json.loads(custom_headers_json)
+                logger.info(f"Loaded {len(custom_headers)} custom headers from environment.")
+            except json.JSONDecodeError:
+                logger.error("Failed to parse CUSTOM_HEADERS environment variable. Expected valid JSON.")
+
         _frun_client = FocusedRun(
             base_url=os.getenv("API_BASE_URL", ""),
             sap_client=os.getenv("SAP_CLIENT", "100"),
@@ -46,7 +58,8 @@ def get_focusedrun_client() -> FocusedRun:
             api_user=os.getenv("API_USER", ""),
             api_password=os.getenv("API_PASSWORD", ""),
             cache_ttl=int(os.getenv("CACHE_TTL", "300")),
-            cache_maxsize=int(os.getenv("CACHE_MAXSIZE", "100"))
+            cache_maxsize=int(os.getenv("CACHE_MAXSIZE", "100")),
+            additional_headers=custom_headers
         )
     return _frun_client
 
@@ -342,6 +355,19 @@ def main():
                                 await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"application/json"), (b"content-length", b"25")]})
                                 await send({"type": "http.response.body", "body": b'{"error": "Unauthorized"}', "more_body": False})
                                 return
+                        return await self.app(scope, receive, send)
+                app = BearerAuthMiddleware(app)
+            
+            original_config_init(self, app, *args, **kwargs)
+        uvicorn.Config.__init__ = patched_config_init
+        
+        mcp.run(transport="sse")
+    else:
+        mcp.run(transport="stdio")
+
+if __name__ == "__main__":
+    main()
+                         return
                         return await self.app(scope, receive, send)
                 app = BearerAuthMiddleware(app)
             

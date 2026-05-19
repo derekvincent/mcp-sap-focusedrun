@@ -23,7 +23,7 @@
 - ***FocusedRun technical user*** with API access to a SAP FocusedRun instance with the following roles ```SAP_FRN_LDB_ALL``` and ```SAP_FRN_LDB_DISP```.
 - ***SAP ICF service*** ```sap/frun/landscape/landscape_api``` activated. 
 - ***An MCP client*** Cursor, Gemini, Claude Desktop, VS Code with Copilot, etc.
-  
+
 ### Installation
 
 1.  **Clone the repository:**
@@ -47,6 +47,7 @@ API_BASE_URL="https://<your-focused-run-host>/sap/frun/landscape/landscape_api"
 SAP_CLIENT="100"
 API_USER="YOUR_API_USER"
 API_PASSWORD="YOUR_API_PASSWORD"
+CUSTOM_HEADERS='{"x-custom-header": "value"}'
 ```
 
 Or pass the configuration directly in your MCP client config (no .env file needed):
@@ -65,7 +66,8 @@ Or pass the configuration directly in your MCP client config (no .env file neede
         "API_BASE_URL": "https://<sap focused run host>/sap/frun/landscape/landscape_api",
         "SAP_CLIENT": "100",
         "API_USER": "YOUR_API_USER",
-        "API_PASSWORD": "YOUR_API_PASSWORD"
+        "API_PASSWORD": "YOUR_API_PASSWORD",
+        "CUSTOM_HEADERS": "{\"x-custom-header\": \"value\"}"
       }
     }
   }
@@ -85,6 +87,7 @@ docker run -d --name sap-mcp -p 8000:8000 --env-file .env mcp-sap-focusedrun
 | SAP_CLIENT | X | 100 | SAP FocusedRun Client |
 | API_USER | X | - | Technical users name |
 | API_PASSWORD | X | - | Technical users password |
+| CUSTOM_HEADERS | | - | Optional JSON string of custom HTTP headers |
 | CACHE_TTL | | 300 | The Service Cache Time to Live (in seconds) |
 | CACHE_MAXSIZE | | 100 | The maximum number of API responses to store in memory |
 | LOG_LEVEL | | INFO | The logging level (e.g., INFO, DEBUG) |
