@@ -367,16 +367,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-                         return
-                        return await self.app(scope, receive, send)
-                app = BearerAuthMiddleware(app)
-            
-            original_config_init(self, app, *args, **kwargs)
-        uvicorn.Config.__init__ = patched_config_init
-        
-        mcp.run(transport="sse")
-    else:
-        mcp.run(transport="stdio")
-
-if __name__ == "__main__":
-    main()
