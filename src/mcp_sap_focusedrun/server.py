@@ -1,6 +1,6 @@
+import json
 import logging
 import os
-import json
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -41,15 +41,32 @@ def get_focusedrun_client() -> FocusedRun:
     if _frun_client is None:
         logger.info("Initializing SAP Focused Run client...")
         
-        # Parse custom headers if provided
+        # Collect custom headers
         custom_headers = {}
-        custom_headers_json = os.getenv("CUSTOM_HEADERS")
-        if custom_headers_json:
+        
+        custom_headers_raw = os.getenv("CUSTOM_HEADERS")
+        if custom_headers_raw:
             try:
-                custom_headers = json.loads(custom_headers_json)
-                logger.info(f"Loaded {len(custom_headers)} custom headers from environment.")
-            except json.JSONDecodeError:
-                logger.error("Failed to parse CUSTOM_HEADERS environment variable. Expected valid JSON.")
+                # Handle cases where the environment might already provide a dict (e.g. via certain config loaders)
+                if isinstance(custom_headers_raw, dict):
+                    custom_headers.update(custom_headers_raw)
+                else:
+                    custom_headers.update(json.loads(custom_headers_raw))
+                logger.info("Loaded custom headers from CUSTOM_HEADERS environment variable.")
+            except (json.JSONDecodeError, TypeError):
+                logger.error("Failed to parse CUSTOM_HEADERS environment variable. Expected valid JSON object.")
+
+        # Cloudflare Access headers
+        cf_id = os.getenv("CF_ACCESS_CLIENT_ID")
+        cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET")
+        if cf_id:
+            custom_headers["CF-Access-Client-Id"] = cf_id
+        if cf_secret:
+            custom_headers["CF-Access-Client-Secret"] = cf_secret
+
+        if custom_headers:
+            logger.info(f"Loaded {len(custom_headers)} custom headers.")
+            logger.debug(f"Custom headers: {custom_headers}")
 
         _frun_client = FocusedRun(
             base_url=os.getenv("API_BASE_URL", ""),

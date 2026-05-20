@@ -88,6 +88,9 @@ docker run -d --name sap-mcp -p 8000:8000 --env-file .env mcp-sap-focusedrun
 | API_USER | X | - | Technical users name |
 | API_PASSWORD | X | - | Technical users password |
 | CUSTOM_HEADERS | | - | Optional JSON string of custom HTTP headers |
+| CF_ACCESS_CLIENT_ID | | - | Cloudflare Access Client ID (optional) |
+| CF_ACCESS_CLIENT_SECRET | | - | Cloudflare Access Client Secret (optional) |
+| CUSTOM_HEADER_* | | - | Individual custom headers (e.g., `CUSTOM_HEADER_X_Custom=Value`) |
 | CACHE_TTL | | 300 | The Service Cache Time to Live (in seconds) |
 | CACHE_MAXSIZE | | 100 | The maximum number of API responses to store in memory |
 | LOG_LEVEL | | INFO | The logging level (e.g., INFO, DEBUG) |
