@@ -2,6 +2,16 @@
 
 This project is a Model Context Protocol (MCP) server that provides tools to interact with SAP Focused Run (FRUN) instances. It allows AI models to query landscape information like hosts directly from a Focused Run system.
 
+## Tennents
+
+- If three consecutive fix attempts fail, STOP. Propose: (a) revert, (b) what we know vs don't know, (c) a different approach.
+- Do not introduce new libraries, frameworks, or services without asking me first.
+- After each feature, update README.md — for someone who'll read it in 3 months having forgotten everything.
+- NEVER Implement Workarounds or Band-Aid Solutions - ALWAYS FIX ROOT CAUSE
+- Before writing code for any non-trivial change, explain in plain language what you understand the goal is and your planned approach. Wait for my 'go.'
+- Require deterministic human confirmation (e.g., Are you sure you want to drop the database?) before executing destructive or production-affecting tasks.
+- Require the agent to outline concrete testing steps or provide mock data verification for every code change it authors
+
 ## Project Overview
 
 - **Purpose:** Expose SAP Focused Run API capabilities as MCP tools.

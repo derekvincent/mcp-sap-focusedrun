@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from .focusedrun_client import FocusedRun
+from .focusedrun_client import FocusedRun, request_config_overrides
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +35,97 @@ mcp = FastMCP("mcp-sap-focusedrun")
 # Global variable to hold our client instance
 _frun_client: Optional[FocusedRun] = None
 
+class HeaderOverrideMiddleware:
+    """
+    ASGI middleware to extract x- headers and populate the request_config_overrides context variable.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            
+            overrides = {}
+            # Map x- headers to internal override keys
+            # Use .get() with bytes since ASGI headers are bytes
+            if b"x-api-base-url" in headers:
+                overrides["base_url"] = headers[b"x-api-base-url"].decode("utf-8")
+            if b"x-api-user" in headers:
+                overrides["api_user"] = headers[b"x-api-user"].decode("utf-8")
+            if b"x-api-password" in headers:
+                overrides["api_password"] = headers[b"x-api-password"].decode("utf-8")
+            if b"x-sap-client" in headers:
+                overrides["sap_client"] = headers[b"x-sap-client"].decode("utf-8")
+            if b"x-cf-access-client-id" in headers:
+                overrides["cf_id"] = headers[b"x-cf-access-client-id"].decode("utf-8")
+            if b"x-cf-access-client-secret" in headers:
+                overrides["cf_secret"] = headers[b"x-cf-access-client-secret"].decode("utf-8")
+
+            if overrides:
+                logger.debug(f"Applying header overrides: {list(overrides.keys())}")
+                token = request_config_overrides.set(overrides)
+                try:
+                    return await self.app(scope, receive, send)
+                finally:
+                    request_config_overrides.reset(token)
+            
+        return await self.app(scope, receive, send)
+
+class BearerAuthMiddleware:
+    """
+    ASGI middleware for Bearer token authentication.
+    Handles tokens with or without "Bearer " prefix in config or request.
+    """
+    def __init__(self, app, token: str):
+        self.app = app
+        # Normalize the expected token: remove "Bearer " if provided in env var
+        clean_token = token.strip()
+        if clean_token.lower().startswith("bearer "):
+            clean_token = clean_token[7:].strip()
+        self.expected_token_value = clean_token
+    
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            # Extract Authorization header (case-insensitive in logic, lowercase in ASGI bytes)
+            auth_header = None
+            for key, value in scope.get("headers", []):
+                if key.lower() == b"authorization":
+                    auth_header = value.decode("utf-8")
+                    break
+            
+            is_authorized = False
+            if auth_header:
+                # Handle potential doubling or prefixes
+                parts = auth_header.split()
+                # Most standard: "Bearer <token>"
+                if len(parts) >= 2 and parts[0].lower() == "bearer":
+                    # We check if the token part matches our expected value
+                    if parts[1] == self.expected_token_value:
+                        is_authorized = True
+                # Fallback: exact match (no prefix in header)
+                elif auth_header == self.expected_token_value:
+                    is_authorized = True
+
+            if not is_authorized:
+                logger.warning(f"Unauthorized access attempt. Path: {scope.get('path')}")
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"content-length", b"25")
+                    ]
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": b'{"error": "Unauthorized"}',
+                    "more_body": False
+                })
+                return
+                
+        return await self.app(scope, receive, send)
+
 def get_focusedrun_client() -> FocusedRun:
     """Lazy initialization of the FocusedRun client."""
     global _frun_client
@@ -56,7 +147,7 @@ def get_focusedrun_client() -> FocusedRun:
             except (json.JSONDecodeError, TypeError):
                 logger.error("Failed to parse CUSTOM_HEADERS environment variable. Expected valid JSON object.")
 
-        # Cloudflare Access headers
+        # Cloudflare Access headers from ENV (Default fallback)
         cf_id = os.getenv("CF_ACCESS_CLIENT_ID")
         cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET")
         if cf_id:
@@ -65,8 +156,7 @@ def get_focusedrun_client() -> FocusedRun:
             custom_headers["CF-Access-Client-Secret"] = cf_secret
 
         if custom_headers:
-            logger.info(f"Loaded {len(custom_headers)} custom headers.")
-            logger.debug(f"Custom headers: {custom_headers}")
+            logger.info(f"Loaded {len(custom_headers)} custom headers from environment.")
 
         _frun_client = FocusedRun(
             base_url=os.getenv("API_BASE_URL", ""),
@@ -107,7 +197,7 @@ async def get_lmdb_hosts(
     if select_fields:
         kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_hosts(hostnames=hostnames, customer_names=customer_names, customer_networks=customer_networks, **kwargs)
+    return await client.get_hosts(hostnames=hostnames, customer_names=customer_names, customer_networks=customer_networks, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_systems(
@@ -158,7 +248,7 @@ async def get_lmdb_systems(
     if select_fields:
         kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_systems(system_ids=system_ids, customer_names=customer_names, system_types=system_types, **kwargs)
+    return await client.get_systems(system_ids=system_ids, customer_names=customer_names, system_types=system_types, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_technical_instances(
@@ -185,7 +275,7 @@ async def get_lmdb_technical_instances(
     if select_fields:
         kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_technical_instances(system_ids=system_ids, **kwargs)
+    return await client.get_technical_instances(system_ids=system_ids, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_databases(
@@ -213,7 +303,7 @@ async def get_lmdb_databases(
     if select_fields:
         kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_databases(system_ids=system_ids, customer_names=customer_names, **kwargs)
+    return await client.get_databases(system_ids=system_ids, customer_names=customer_names, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_cloud_tenants(
@@ -241,7 +331,7 @@ async def get_lmdb_cloud_tenants(
     if select_fields:
         kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_cloud_tenants(tenant_ids=tenant_ids, customer_names=customer_names, **kwargs)
+    return await client.get_cloud_tenants(tenant_ids=tenant_ids, customer_names=customer_names, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_installed_software_components(
@@ -264,7 +354,7 @@ async def get_lmdb_installed_software_components(
     if skip is not None: kwargs["$skip"] = skip
     if select_fields: kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_installed_software_components(system_ids=system_ids, **kwargs)
+    return await client.get_installed_software_components(system_ids=system_ids, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_installed_product_versions(
@@ -287,7 +377,7 @@ async def get_lmdb_installed_product_versions(
     if skip is not None: kwargs["$skip"] = skip
     if select_fields: kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_installed_product_versions(system_ids=system_ids, **kwargs)
+    return await client.get_installed_product_versions(system_ids=system_ids, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_abap_clients(
@@ -310,7 +400,7 @@ async def get_lmdb_abap_clients(
     if skip is not None: kwargs["$skip"] = skip
     if select_fields: kwargs["$select"] = ",".join(select_fields)
         
-    return client.get_abap_clients(system_ids=system_ids, **kwargs)
+    return await client.get_abap_clients(system_ids=system_ids, **kwargs)
 
 @mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_single_database() -> dict:
@@ -321,7 +411,7 @@ async def get_lmdb_single_database() -> dict:
     """
     logger.info("Tool 'get_lmdb_single_database' invoked")
     client = get_focusedrun_client()
-    return client.get_single_database()
+    return await client.get_single_database()
 
 # MCP Prompts
 @mcp.prompt()
@@ -349,36 +439,27 @@ def main():
     if transport in ["sse", "streamable-http"]:
         import uvicorn
         port = int(os.getenv("PORT", "8000"))
+        host = os.getenv("HOST", "0.0.0.0")
         
-        # FastMCP's SSE transport defaults to 127.0.0.1.
-        # We monkeypatch uvicorn.Config to force binding to 0.0.0.0 and optionally inject ASGI auth middleware.
-        original_config_init = uvicorn.Config.__init__
-        def patched_config_init(self, app, *args, **kwargs):
-            kwargs["host"] = "0.0.0.0"
-            kwargs["port"] = port
-            
-            auth_token = os.getenv("MCP_SERVER_AUTH_TOKEN")
-            if auth_token:
-                logger.info("Authentication enabled. Bearer token required for SSE endpoints.")
-                class BearerAuthMiddleware:
-                    def __init__(self, app):
-                        self.app = app
-                        self.token = f"Bearer {auth_token}".encode("utf-8")
-                    
-                    async def __call__(self, scope, receive, send):
-                        if scope["type"] == "http":
-                            headers = dict(scope.get("headers", []))
-                            if headers.get(b"authorization") != self.token:
-                                await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"application/json"), (b"content-length", b"25")]})
-                                await send({"type": "http.response.body", "body": b'{"error": "Unauthorized"}', "more_body": False})
-                                return
-                        return await self.app(scope, receive, send)
-                app = BearerAuthMiddleware(app)
-            
-            original_config_init(self, app, *args, **kwargs)
-        uvicorn.Config.__init__ = patched_config_init
+        # Get the underlying Starlette app from FastMCP
+        if transport == "sse":
+            app = mcp.sse_app()
+        else:
+            app = mcp.streamable_http_app()
         
-        mcp.run(transport="sse")
+        # Apply middlewares (Outer to Inner)
+        
+        # 1. Bearer Auth Middleware (Outer)
+        auth_token = os.getenv("MCP_SERVER_AUTH_TOKEN")
+        if auth_token:
+            logger.info("Authentication enabled. Bearer token required for SSE endpoints.")
+            app = BearerAuthMiddleware(app, auth_token)
+            
+        # 2. Header Override Middleware (Inner)
+        app = HeaderOverrideMiddleware(app)
+        
+        logger.info(f"Starting MCP server on {host}:{port} via {transport}")
+        uvicorn.run(app, host=host, port=port)
     else:
         mcp.run(transport="stdio")
 

@@ -8,10 +8,11 @@
 ## Key Features
 
 - Exposes comprehensive SAP Focused Run endpoints: **Hosts, Systems, Databases, Cloud Tenants, Technical Instances, ABAP Clients, Software Components, and Product Versions**.
-- Lazy, on-demand client initialization.
-- Graceful error handling for API and network issues.
+- **High-Performance Async Architecture**: Built on `httpx.AsyncClient` with connection pooling and async transport support (`stdio`, `sse`, `streamable-http`).
+- **Production Resilience**: Built-in exponential backoff retries for transient SAP API errors (502, 503, 504) and network blips.
+- **Identity-Isolated Caching**: 5-minute TTL cache with strict SHA-256 identity isolation, ensuring no data leakage between different tenants or credentials.
+- **Security-First Logging**: Sensitive values like usernames and tokens are automatically redacted in logs.
 - Packaged as a standard Python application with a command-line entry point.
-- **Built-in 5-minute TTL caching** to protect the SAP backend from duplicate LLM requests.
 - Includes predefined MCP Prompts for deep system analysis and landscape discovery.
 
 ## Quick Start 
@@ -77,26 +78,53 @@ or via the Docker image:
 
 ```bash
 docker build -t mcp-sap-focusedrun .
-docker run -d --name sap-mcp -p 8000:8000 --env-file .env mcp-sap-focusedrun
+docker run -it --rm --name sap-mcp -p 8000:8000 --env-file .env mcp-sap-focusedrun
 
 ```
+
 ## Configuration 
+
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| API_BASE_URL | X | - | Base url for the service to call the API |
-| SAP_CLIENT | X | 100 | SAP FocusedRun Client |
-| API_USER | X | - | Technical users name |
-| API_PASSWORD | X | - | Technical users password |
-| CUSTOM_HEADERS | | - | Optional JSON string of custom HTTP headers |
-| CF_ACCESS_CLIENT_ID | | - | Cloudflare Access Client ID (optional) |
-| CF_ACCESS_CLIENT_SECRET | | - | Cloudflare Access Client Secret (optional) |
-| CUSTOM_HEADER_* | | - | Individual custom headers (e.g., `CUSTOM_HEADER_X_Custom=Value`) |
-| CACHE_TTL | | 300 | The Service Cache Time to Live (in seconds) |
-| CACHE_MAXSIZE | | 100 | The maximum number of API responses to store in memory |
-| LOG_LEVEL | | INFO | The logging level (e.g., INFO, DEBUG) |
-| PORT | | 8000 | The port to bind to when running via HTTP/SSE |
-| TRANSPORT | | stdio | Use "sse" for HTTP Server-Sent Events, or "stdio" for standard input/output |
-| MCP_SERVER_AUTH_TOKEN | | - | Strongly recommended for SSE transport |
+| `API_BASE_URL` | X | - | Base url for the Focused Run API |
+| `SAP_CLIENT` | X | 100 | SAP FocusedRun Client |
+| `API_USER` | X | - | Technical user name |
+| `API_PASSWORD` | X | - | Technical user password |
+| `CUSTOM_HEADERS` | | - | Optional JSON string of custom HTTP headers |
+| `CF_ACCESS_CLIENT_ID` | | - | Cloudflare Access Client ID (optional) |
+| `CF_ACCESS_CLIENT_SECRET` | | - | Cloudflare Access Client Secret (optional) |
+| `MCP_SERVER_AUTH_TOKEN` | | - | Required for SSE/HTTP transport (raw token value) |
+| `TRANSPORT` | | `stdio` | `sse`, `streamable-http`, or `stdio` |
+| `PORT` | | 8000 | The port to bind to when running via HTTP |
+| `HOST` | | 0.0.0.0 | The host interface to bind to |
+| `LOG_LEVEL` | | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `CACHE_TTL` | | 300 | API response cache TTL in seconds |
+| `CACHE_MAXSIZE` | | 100 | Max number of responses to cache |
+
+## Configuration Overrides (via HTTP Headers)
+
+When running the server in `sse` or `streamable-http` mode, you can dynamically override the configuration for each request. This is ideal for multi-tenant setups.
+
+### Supported Overrides
+
+| Header | Overrides Env Var |
+| :--- | :--- |
+| `x-api-base-url` | `API_BASE_URL` |
+| `x-api-user` | `API_USER` |
+| `x-api-password` | `API_PASSWORD` |
+| `x-sap-client` | `SAP_CLIENT` |
+| `x-cf-access-client-id` | `CF_ACCESS_CLIENT_ID` |
+| `x-cf-access-client-secret` | `CF_ACCESS_CLIENT_SECRET` |
+
+> **Precedence:** Header values take absolute precedence over environment variables. If a header is not provided, the server falls back to the default value defined in your environment.
+
+### Authentication
+
+When using HTTP transports, provide your `MCP_SERVER_AUTH_TOKEN` in the `Authorization` header:
+`Authorization: Bearer <your_token>`
+
+The server is robust and handles tokens with or without the `Bearer ` prefix gracefully.
+
 ## Running Tests
 
 To run the test suite and verify the connection to your SAP Focused Run system, first install `pytest`:

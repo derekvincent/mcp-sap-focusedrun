@@ -10,6 +10,8 @@ dependencies = [
     "httpx>=0.28.1",
     "mcp[cli]>=1.25.0",
     "python-dotenv>=1.2.1",
+    "uvicorn>=0.34.0",
+    "starlette>=0.45.2",
 ]
 
 [project.scripts]
