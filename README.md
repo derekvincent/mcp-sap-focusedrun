@@ -94,6 +94,7 @@ docker run -it --rm --name sap-mcp -p 8000:8000 --env-file .env mcp-sap-focusedr
 | `CF_ACCESS_CLIENT_ID` | | - | Cloudflare Access Client ID (optional) |
 | `CF_ACCESS_CLIENT_SECRET` | | - | Cloudflare Access Client Secret (optional) |
 | `MCP_SERVER_AUTH_TOKEN` | | - | Required for SSE/HTTP transport (raw token value) |
+| `MCP_ALLOWED_HOSTS` | | 127.0.0.1, localhost | Comma-separated list of allowed host headers. Required when deploying behind a proxy (like K8s Ingress) to prevent 421 DNS Rebinding errors. (e.g. `mcp.my-domain.com,mcp-service`) |
 | `TRANSPORT` | | `stdio` | `sse`, `streamable-http`, or `stdio` |
 | `PORT` | | 8000 | The port to bind to when running via HTTP |
 | `HOST` | | 0.0.0.0 | The host interface to bind to |

@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
 from .focusedrun_client import FocusedRun, request_config_overrides
@@ -30,7 +31,21 @@ default_tool_annotations = ToolAnnotations(
 )
 
 # Initialize the MCP server
-mcp = FastMCP("mcp-sap-focusedrun")
+allowed_hosts_str = os.getenv("MCP_ALLOWED_HOSTS", "")
+if allowed_hosts_str:
+    allowed_hosts = [h.strip() for h in allowed_hosts_str.split(",") if h.strip()]
+    # Ensure local development hosts are included to prevent breaking local testing
+    if not any(h.startswith("localhost") or h.startswith("127.0.0.1") for h in allowed_hosts):
+        allowed_hosts.extend(["127.0.0.1:*", "localhost:*"])
+    
+    security_settings = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=["*"] # Allow all origins, rely on ingress for CORS if needed
+    )
+    mcp = FastMCP("mcp-sap-focusedrun", transport_security=security_settings)
+else:
+    mcp = FastMCP("mcp-sap-focusedrun")
 
 # Global variable to hold our client instance
 _frun_client: Optional[FocusedRun] = None
