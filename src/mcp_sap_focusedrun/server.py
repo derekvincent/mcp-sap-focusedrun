@@ -50,6 +50,24 @@ else:
 # Global variable to hold our client instance
 _frun_client: Optional[FocusedRun] = None
 
+class SseValidationErrorHandlerMiddleware:
+    """
+    ASGI middleware to catch specific ValueError raised by mcp.server.sse when
+    HostHeader validation fails, preventing unhandled exception tracebacks in the logs.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        try:
+            return await self.app(scope, receive, send)
+        except ValueError as e:
+            if str(e) == "Request validation failed":
+                # The response (e.g. 421) has already been sent by connect_sse.
+                # We can safely swallow this exception.
+                return
+            raise
+
 class HeaderOverrideMiddleware:
     """
     ASGI middleware to extract x- headers and populate the request_config_overrides context variable.
@@ -472,6 +490,9 @@ def main():
             
         # 2. Header Override Middleware (Inner)
         app = HeaderOverrideMiddleware(app)
+        
+        # 3. Error Handling Middleware (Inner-most custom)
+        app = SseValidationErrorHandlerMiddleware(app)
         
         logger.info(f"Starting MCP server on {host}:{port} via {transport}")
         uvicorn.run(app, host=host, port=port)
