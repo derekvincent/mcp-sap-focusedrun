@@ -1,0 +1,19 @@
+services:
+  mcp-app:
+    build: .
+    environment:
+      - TRANSPORT=sse
+      - PORT=8000
+      - HOST=0.0.0.0
+      - MCP_ALLOWED_HOSTS=allowed.local, mcp.local.sse
+    ports:
+      - "8000:8000"
+
+  proxy:
+    image: nginx:alpine
+    volumes:
+      - ./nginx-test.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - mcp-app
