@@ -204,6 +204,31 @@ def get_focusedrun_client() -> FocusedRun:
     return _frun_client
 
 @mcp.tool(annotations=default_tool_annotations)
+async def find_customer(
+    customer_network_id: Optional[str] = None,
+    search_query: Optional[str] = None,
+    top: int = 20,
+    skip: int = 0
+) -> dict:
+    """
+    Find customer information (ID, Network Name, Customer Name).
+    Use this tool when you need to resolve a customer name to a CUSTOMER_NETWORK ID or vice versa.
+    This tool provides a minimal data set to reduce context overhead.
+    It deduplicates results from the product versions landscape.
+    - If customer_network_id is provided, it attempts a direct hit first.
+    - search_query performs a fuzzy search across CUSTOMER_NAME, CUSTOMER_NETWORK, and CUSTOMER_NETWORK_NAME.
+    """
+    logger.info(f"Tool 'find_customer' invoked | id={customer_network_id}, query={search_query}, top={top}, skip={skip}")
+    client = get_focusedrun_client()
+    
+    return await client.get_customers(
+        customer_network_id=customer_network_id,
+        search_query=search_query,
+        top=top,
+        skip=skip
+    )
+
+@mcp.tool(annotations=default_tool_annotations)
 async def get_lmdb_hosts(
     hostnames: Optional[List[str]] = None,
     customer_names: Optional[List[str]] = None,

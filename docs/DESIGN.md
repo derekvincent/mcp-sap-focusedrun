@@ -44,6 +44,16 @@ The server maps the following SAP LMDB Public API endpoints to MCP Tools, using 
 - `get_lmdb_installed_product_versions`: Main product versions.
 - `get_lmdb_abap_clients`: Configured clients (e.g., 000, 100).
 - `get_lmdb_single_database`: Explicit single database endpoint.
+- `find_customer`: (New) Specialized tool for resolving Customer IDs and Names with minimal data transfer.
+
+### 2.6 Customer Search Architectural Strategy
+The `find_customer` tool implements a specialized search strategy to overcome specific limitations of the SAP LMDB Public API:
+- **Endpoint Selection:** It utilizes the `landscape_api_installed_product_versions` endpoint as it consistently contains customer metadata across the landscape.
+- **Context Efficiency:** To minimize LLM context usage, the tool uses `$select` to restrict the payload to only three fields: `CUSTOMER_NETWORK`, `CUSTOMER_NETWORK_NAME`, and `CUSTOMER_NAME`.
+- **Hybrid Search Model:**
+    - **Exhaustive Recursive Fetch:** Due to the LMDB API's instability when combining multiple OData `or` filters with parentheses (which often results in HTTP 400 errors), the tool performs a series of paginated requests (using `$skip` and `$top`). It fetches batches of 2,000 records recursively until the end of the data set is reached (or a safety limit of 20,000 is hit).
+    - **Client-Side Fuzzy Filtering:** Filtering for `search_query` is performed on the client side across all three customer fields. This ensures that every customer in the landscape is analyzed for a match, regardless of the total landscape size.
+    - **Deduplication:** Since the source endpoint returns one record per product version, the tool deduplicates results by `CUSTOMER_NETWORK` before returning them to the LLM.
 
 **MCP Prompts:**
 - `analyze_sap_system`: Guides the LLM to perform a deep-dive analysis of a specific `system_id`.

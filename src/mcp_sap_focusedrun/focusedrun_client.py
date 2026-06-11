@@ -233,3 +233,91 @@ class FocusedRun:
 
     async def get_single_database(self, **kwargs) -> dict:
         return await self._make_request(self.LANDSCAPE_API_SINGLE_DATABASE, **kwargs)
+
+    async def get_customers(self, customer_network_id: str = None, search_query: str = None, top: int = 50, skip: int = 0, **kwargs) -> dict:
+        """
+        Retrieves a deduplicated list of customers from the product versions endpoint.
+        Performs client-side filtering to avoid SAP LMDB OData 400 errors with complex OR filters.
+        Fetches multiple pages from SAP to ensure exhaustive coverage in large landscapes.
+        """
+        endpoint = self.LANDSCAPE_API_PRODUCT_VERSIONS
+        
+        # Limit fields to minimize data transfer
+        kwargs["$select"] = "CUSTOMER_NETWORK,CUSTOMER_NETWORK_NAME,CUSTOMER_NAME"
+        
+        # 1. Base Filter (ID only if provided)
+        if customer_network_id:
+            kwargs["$filter"] = f"CUSTOMER_NETWORK eq '{customer_network_id}'"
+        
+        # 2. Exhaustive Fetch with Pagination
+        # We fetch in batches until we reach the end of the landscape data.
+        all_results = []
+        batch_size = 2000
+        current_skip = 0
+        max_total_fetch = 20000 # Safety limit to prevent runaway memory usage
+        
+        while True:
+            fetch_kwargs = kwargs.copy()
+            fetch_kwargs["$top"] = batch_size
+            fetch_kwargs["$skip"] = current_skip
+            
+            data = await self._make_request(endpoint, **fetch_kwargs)
+            if "error" in data:
+                # If we already have some results, we'll process those instead of failing
+                if all_results: break 
+                return data
+
+            results = data if isinstance(data, list) else data.get("d", {}).get("results", [])
+            if not isinstance(results, list) or not results:
+                break
+                
+            all_results.extend(results)
+            
+            # If the server returned fewer records than we asked for, we reached the end
+            if len(results) < batch_size:
+                break
+                
+            current_skip += len(results)
+            if current_skip >= max_total_fetch:
+                logger.warning(f"Customer search reached safety limit of {max_total_fetch} records. Results may be incomplete.")
+                break
+
+        # 3. Deduplicate and Filter Client-Side
+        unique_customers = {}
+        q = search_query.strip().lower() if search_query else None
+        
+        for r in all_results:
+            cid = r.get("CUSTOMER_NETWORK")
+            if not cid:
+                continue
+                
+            c_name = (r.get("CUSTOMER_NAME") or "")
+            cn_name = (r.get("CUSTOMER_NETWORK_NAME") or "")
+            
+            # Apply fuzzy filter if query provided
+            if q:
+                if q not in c_name.lower() and \
+                   q not in cn_name.lower() and \
+                   q not in cid.lower():
+                    continue
+
+            if cid not in unique_customers:
+                unique_customers[cid] = {
+                    "CUSTOMER_NETWORK": cid,
+                    "CUSTOMER_NETWORK_NAME": cn_name,
+                    "CUSTOMER_NAME": c_name
+                }
+        
+        customer_list = list(unique_customers.values())
+        total_found = len(customer_list)
+        
+        # Apply pagination to the deduplicated list for the LLM's response
+        paginated_list = customer_list[skip : skip + top]
+
+        return {
+            "customers": paginated_list,
+            "total_count": total_found,
+            "top": top,
+            "skip": skip,
+            "fetched_records": len(all_results)
+        }

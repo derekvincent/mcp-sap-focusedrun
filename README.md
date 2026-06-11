@@ -7,6 +7,7 @@
 
 ## Key Features
 
+- **Customer Resolution**: New `find_customer` tool to resolve Customer IDs, Names, and Networks with minimal data transfer and fuzzy search capabilities.
 - Exposes comprehensive SAP Focused Run endpoints: **Hosts, Systems, Databases, Cloud Tenants, Technical Instances, ABAP Clients, Software Components, and Product Versions**.
 - **High-Performance Async Architecture**: Built on `httpx.AsyncClient` with connection pooling and async transport support (`stdio`, `sse`, `streamable-http`).
 - **Production Resilience**: Built-in exponential backoff retries for transient SAP API errors (502, 503, 504) and network blips.
@@ -137,9 +138,20 @@ Then run the tests:
 pytest
 ```
 
+## Tools Provided
+
+- `find_customer`: (New) Resolves customer names or network IDs to a minimal data set (`CUSTOMER_NETWORK`, `CUSTOMER_NETWORK_NAME`, `CUSTOMER_NAME`). Performs an **exhaustive recursive search** across the entire landscape with client-side deduplication.
+- `get_lmdb_hosts`: Fetches host information from the LMDB.
+- `get_lmdb_systems`: Fetches technical systems.
+- `get_lmdb_technical_instances`: Fetches technical instances.
+- `get_lmdb_databases`: Fetches database instances.
+- `get_lmdb_cloud_tenants`: Fetches registered cloud tenants.
+- `get_lmdb_installed_software_components`: Fetches installed software components.
+- `get_lmdb_installed_product_versions`: Fetches installed product versions.
+- `get_lmdb_abap_clients`: Fetches configured ABAP clients.
+- `get_lmdb_single_database`: Explicit endpoint for single databases.
+
 ## Current Issues 
 
 1. The following API's endpoint have not been fully tested: 
-   1. ```landscape_api_single_database```
-   2. ```landscape_api_technical_instances```
-   3. ```landscape_api_abap_clients```
+   1. ```landscape_api_single_database``` - This API services itself seem to have issues. 

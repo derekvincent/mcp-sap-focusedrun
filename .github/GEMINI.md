@@ -65,6 +65,7 @@ This project is a Model Context Protocol (MCP) server that provides tools to int
 
 ## Tools Provided
 
+- `find_customer`: Resolves customer names or network IDs to a minimal data set.
 - `get_lmdb_hosts`: Fetches host information from the LMDB.
 - `get_lmdb_systems`: Fetches technical systems.
 - `get_lmdb_technical_instances`: Fetches technical instances.
