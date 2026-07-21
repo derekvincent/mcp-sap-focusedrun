@@ -129,18 +129,15 @@ The server is robust and handles tokens with or without the `Bearer ` prefix gra
 
 ## Running Tests
 
-To run the test suite and verify the connection to your SAP Focused Run system, first install `pytest`:
+To run the test suite and verify the connection to your SAP Focused Run system, run the tests using `uv`:
 ```bash
-pip install pytest
-```
-Then run the tests:
-```bash
-pytest
+uv run pytest
 ```
 
 ## Tools Provided
 
 - `find_customer`: (New) Resolves customer names or network IDs to a minimal data set (`CUSTOMER_NETWORK`, `CUSTOMER_NETWORK_NAME`, `CUSTOMER_NAME`). Performs an **exhaustive recursive search** across the entire landscape with client-side deduplication.
+- `search_lmdb_by_product_version`: (New) Searches for customer systems in the LMDB by product version name. Supports wildcard queries (e.g., `SAP ERP` or `*SAP ERP*`), customer name/network filtering, and case-insensitive client-side filtering on environment tier (e.g., `DEV`, `QAS`, `PROD`, `Sandbox`, `DR`).
 - `get_lmdb_hosts`: Fetches host information from the LMDB.
 - `get_lmdb_systems`: Fetches technical systems.
 - `get_lmdb_technical_instances`: Fetches technical instances.

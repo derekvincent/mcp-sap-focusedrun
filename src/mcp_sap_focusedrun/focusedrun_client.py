@@ -2,8 +2,8 @@ import asyncio
 import hashlib
 import logging
 import time
-from typing import List, Optional, Any
 from contextvars import ContextVar
+from typing import Any, List, Optional
 
 import httpx
 from cachetools import TTLCache
@@ -321,3 +321,56 @@ class FocusedRun:
             "skip": skip,
             "fetched_records": len(all_results)
         }
+
+    async def search_by_product_version(
+        self,
+        product_version_name: str,
+        customer_name: Optional[str] = None,
+        customer_network: Optional[str] = None,
+        tier: Optional[str] = None,
+        **kwargs
+    ) -> List[dict]:
+        """
+        Search for systems by product version name with optional filters.
+        Performs client-side filtering on the ITADMIN_ROLE (tier) field.
+        """
+        filters = []
+        filters.append(f"INST_PRODUCT_VERSION_NAME eq '{product_version_name}'")
+        
+        if customer_name:
+            filters.append(f"CUSTOMER_NAME eq '{customer_name}'")
+        if customer_network:
+            filters.append(f"CUSTOMER_NETWORK eq '{customer_network}'")
+            
+        kwargs["$filter"] = " and ".join(filters)
+        
+        data = await self._make_request(self.LANDSCAPE_API_PRODUCT_VERSIONS, **kwargs)
+        if "error" in data:
+            return data
+            
+        results = data if isinstance(data, list) else data.get("d", {}).get("results", [])
+        if not isinstance(results, list):
+            return []
+            
+        if tier:
+            tier_lower = tier.lower().strip()
+            filtered_results = []
+            for r in results:
+                role = (r.get("ITADMIN_ROLE") or r.get("IT_ADMIN_ROLE") or "").lower()
+                
+                matched = False
+                if tier_lower in ["prod", "production"]:
+                    matched = "prod" in role
+                elif tier_lower in ["dev", "development"]:
+                    matched = "dev" in role
+                elif tier_lower in ["qas", "qa", "quality", "test", "tst"]:
+                    matched = "qual" in role or "test" in role
+                else:
+                    matched = tier_lower in role
+                    
+                if matched:
+                    filtered_results.append(r)
+            return filtered_results
+            
+        return results
+

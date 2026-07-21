@@ -471,6 +471,45 @@ async def get_lmdb_single_database() -> dict:
     client = get_focusedrun_client()
     return await client.get_single_database()
 
+@mcp.tool(annotations=default_tool_annotations)
+async def search_lmdb_by_product_version(
+    product_version_name: str,
+    customer_name: Optional[str] = None,
+    customer_network: Optional[str] = None,
+    tier: Optional[str] = None,
+    top: Optional[int] = None,
+    skip: Optional[int] = None,
+    select_fields: Optional[List[str]] = None
+) -> dict:
+    """
+    Search for customer systems in the LMDB by product version name.
+    Supports wildcard queries (e.g. 'SAP ERP' or '*SAP ERP*').
+    Allows optional customer name and customer network filtering.
+    Performs case-insensitive client-side filtering on the environment 'tier' parameter
+    (e.g., 'DEV' or 'Development', 'QAS' or 'Quality' or 'Test', 'PROD' or 'Production',
+    or custom tiers like 'Sandbox', 'Training', 'DR').
+    This is a read-only operation.
+    """
+    logger.info(
+        f"Tool 'search_lmdb_by_product_version' invoked | "
+        f"product={product_version_name}, customer={customer_name}, "
+        f"network={customer_network}, tier={tier}"
+    )
+    client = get_focusedrun_client()
+    
+    kwargs = {}
+    if top is not None: kwargs["$top"] = top
+    if skip is not None: kwargs["$skip"] = skip
+    if select_fields: kwargs["$select"] = ",".join(select_fields)
+        
+    return await client.search_by_product_version(
+        product_version_name=product_version_name,
+        customer_name=customer_name,
+        customer_network=customer_network,
+        tier=tier,
+        **kwargs
+    )
+
 # MCP Prompts
 @mcp.prompt()
 def analyze_sap_system(system_id: str) -> str:
